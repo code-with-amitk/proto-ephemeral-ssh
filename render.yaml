@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: jit-ssh
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: JIT_CA_KEY_PATH
+        value: /var/data/ca_key
+    disk:
+      name: jit-ca-data
+      mountPath: /var/data
+      sizeGB: 1

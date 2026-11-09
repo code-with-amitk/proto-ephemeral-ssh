@@ -62,7 +62,8 @@ Development is staged so each increment has a concrete test:
 2. Implement CA lifecycle and SSH certificate signing, with unit tests verifying signatures and certificate fields.
 3. Implement and test the request API, including malformed input and duration limits.
 4. Implement the CLI's in-memory key generation, API call, restrictive local file writes, and SSH command output.
-5. Verify the complete path against a disposable OpenSSH server configured to trust the CA, without client entries in `authorized_keys`.
-6. Document operator setup and run the complete unit, integration, static-analysis, and build checks.
+5. Package the daemon for Render and provide a web interface to prepare a CLI request and distribute the CA public key.
+6. Verify the complete path against a disposable OpenSSH server configured to trust the CA, without client entries in `authorized_keys`.
+7. Document operator setup and run the complete unit, integration, static-analysis, and build checks.
 
 See the detailed, phase-by-phase acceptance commands in [the development TODO](../TODOList.md). The design and component interactions are described in [Architecture](./architecture.md).

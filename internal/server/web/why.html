@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Why Keyline focuses on short-lived OpenSSH certificate issuance.">
+  <title>Why Keyline — Short-lived SSH access</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Keyline home"><span class="brand-mark">K</span> Keyline</a>
+    <nav><a href="/">Request access</a><a href="/ca.pub">Download CA public key</a></nav>
+  </header>
+  <main class="why-page">
+    <section class="hero">
+      <p class="eyebrow">A SMALLER TOOL FOR A SPECIFIC JOB</p>
+      <h1>SSH access, without<br><span>the long-lived key sprawl.</span></h1>
+      <p class="hero-copy">Keyline focuses on one workflow: issue a short-lived OpenSSH user certificate, then let the user connect directly to the destination host.</p>
+    </section>
+    <section class="panel">
+      <h2>Why this product exists</h2>
+      <p>Some teams need just-in-time SSH credentials but do not need to adopt a broad privileged access management (PAM) platform solely for certificate issuance. Keyline is designed as a small, self-operated issuer that works with OpenSSH’s built-in certificate trust.</p>
+      <div class="benefit-grid">
+        <article><span class="benefit-number">01</span><h3>Short-lived by design</h3><p>Certificates are capped by the issuer at 15 minutes. OpenSSH checks validity when a connection is authenticated, reducing dependence on long-lived client credentials.</p></article>
+        <article><span class="benefit-number">02</span><h3>Less key distribution</h3><p>Configure each target to trust the CA once. For this access flow, operators do not need to append every user's public key to every account’s <code>authorized_keys</code>.</p></article>
+        <article><span class="benefit-number">03</span><h3>Direct OpenSSH connection</h3><p>After issuance, the client connects directly to the target using the normal SSH path. The issuer is not an inline session proxy.</p></article>
+        <article><span class="benefit-number">04</span><h3>Focused operational scope</h3><p>Run a purpose-built service for SSH certificate issuance when that is the immediate need, and integrate it with the identity and infrastructure controls you already operate.</p></article>
+      </div>
+    </section>
+    <section class="tradeoff">
+      <p class="eyebrow">A FOCUSED TOOL IS A TRADE-OFF</p>
+      <h2>Not a replacement for every PAM program.</h2>
+      <p>Enterprise PAM products may provide approvals, session recording, credential vaulting and rotation, centralized policy, and governance. Keyline does not currently implement those capabilities, nor API authentication or requester authorization. Short-lived certificates do not replace them.</p>
+      <p>Choose a broader PAM solution when those controls are required. Consider Keyline only when a team specifically needs SSH certificate issuance and is prepared to provide the surrounding security controls and operations.</p>
+      <a class="button" href="/">Prepare an access command <span aria-hidden="true">→</span></a>
+    </section>
+  </main>
+  <footer><span>Keyline · OpenSSH-native, short-lived access</span><a href="/">Home</a></footer>
+</body>
+</html>

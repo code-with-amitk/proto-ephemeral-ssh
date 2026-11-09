@@ -7,9 +7,11 @@ This project is intended to make short-lived SSH access practical for teams that
 CyberArk documents OpenSSH-based authentication as part of its PAM offering ([CyberArk documentation](https://docs.cyberark.com/pam-self-hosted/latest/en/content/pasimp/configuring-authentication-methods.htm)). That can be the right choice when an organization needs an integrated PAM program: centralized credential management, policy and approvals, session controls, auditing, and other enterprise workflows. This project's intended niche is narrower: teams that primarily need short-lived SSH certificates and prefer a small, purpose-built service they can operate alongside their existing identity and infrastructure.
 
 ## What it is intended to do
-
-The planned Go engine issues OpenSSH user certificates for client-generated public keys. The CLI creates a temporary Ed25519 keypair, sends only its public key to the engine, receives a CA-signed certificate, and uses that certificate to connect directly to the target host.
-
+- SSH Client will generate public, pvt keys
+- "Go Engine" is Signing CA and listening on 8080
+- SSH Client will request open-ssh certificate from "GO ENGINE" using its public key on endpoint "/api/v1/request-access"
+- "GO ENGINE" will generate a OpenSSH certificate for SSH Client expiring in 15 minutes.
+- 
 The target trusts the SSH CA public key rather than maintaining an entry for every user's key in `authorized_keys`:
 
 ```text
@@ -48,6 +50,40 @@ Potential advantages for that case:
 
 This is a trade-off, not a universal improvement. Enterprise PAM may provide important capabilities—such as session recording, approval workflows, credential vaulting and rotation, and centralized governance—that this project does not currently specify. Choose PAM when those controls are required; consider this project when the SSH certificate workflow itself is the requirement and the team is prepared to own the surrounding controls.
 
+## Render deployment and web flow
+
+The daemon serves the access-command homepage at `/`, the product rationale at `/why`, the CA public key download at `/ca.pub`, and the signing API at `/api/v1/request-access`. The Render blueprint in [`render.yaml`](./render.yaml) builds the Docker image and mounts a persistent disk at `/var/data`, where the CA key is stored. The CA private key must survive redeployments; do not use an ephemeral filesystem for it.
+
+### Deploy on Render
+
+1. Push this repository to a Git provider connected to your Render account.
+2. In Render, choose **New → Blueprint**, select the repository, and apply the `render.yaml` blueprint. Review the service and persistent-disk cost before creating it. Alternatively, create a Docker web service manually, set the disk mount path to `/var/data`, and set `JIT_CA_KEY_PATH=/var/data/ca_key`.
+3. Keep the service's `PORT` environment variable set to `8080`; the daemon listens on that port inside the container while Render provides the public HTTPS endpoint. The blueprint configures the health check at `/healthz`.
+4. Wait for the service to become healthy. Open the public `https://<service-name>.onrender.com/` URL. The service's public issuer address is the Render hostname, HTTPS, port `443` (not the container port).
+5. Download `/ca.pub` from the service. Install that public key on each destination host as `/etc/ssh/jit_ca.pub`, configure `TrustedUserCAKeys /etc/ssh/jit_ca.pub` in `/etc/ssh/sshd_config`, run `sudo sshd -t`, and reload the SSH service (`sshd` or, on some Debian/Ubuntu hosts, `ssh`). Only the CA **public** key belongs on target hosts.
+
+Render's persistent disk preserves the CA identity across deploys. Protect access to that disk and maintain a secure backup of the CA private key. A lost or replaced key changes the CA identity and requires distributing the new public key to every target. Persistent disks are a paid Render feature and generally constrain a service to one running instance; review current Render limits and pricing.
+
+### Request a certificate and connect
+
+Install the CLI on the computer from which you will connect. From a repository checkout, build it into a directory on your `PATH`:
+
+```sh
+mkdir -p "$HOME/.local/bin"
+go build -o "$HOME/.local/bin/jit-cli" ./cmd/jit-cli
+```
+
+Run the build command from the repository root and ensure `$HOME/.local/bin` is on your `PATH`. Then open the service homepage and provide:
+
+- **Destination username**: the existing account on the target machine (for example, `ubuntu`).
+- **Destination hostname or IP**: where SSH should connect (for example, `target.example.com`).
+- **Duration**: choose 5, 10, or 15 minutes. The issuer enforces a 15-minute maximum.
+- **Issuer hostname, port, and protocol**: for Render, use the public `*.onrender.com` hostname, port `443`, and `HTTPS`.
+
+The form creates a copyable `jit-cli access` command; it does not create credentials in the browser. Run the command locally. The CLI generates the ephemeral private key on your computer, sends only its public key to the issuer, saves the private key and returned certificate under `~/.ssh/jit/`, then prints the SSH connection command. Run that printed `ssh ...` command to connect directly to the target. Certificate issuance does not itself open an SSH session.
+
+**Security limitation:** the current signing API does not authenticate callers or authorize target accounts; the `identity` value is not proof of identity. Render services are publicly reachable by default. Do not expose this issuer publicly or use it for production access until requester authentication and authorization (and any needed audit, rate limiting, and policy controls) are implemented. HTTPS protects traffic in transit but does not provide caller authorization.
+
 ## Planned request flow
 
 1. The user invokes `jit-cli access` with a target account, host, and requested duration.
@@ -56,9 +92,48 @@ This is a trade-off, not a universal improvement. Enterprise PAM may provide imp
 4. The CLI stores the private key and certificate locally with restrictive permissions and prints a direct SSH command.
 5. The target's `sshd` accepts certificates signed by the configured CA, subject to normal OpenSSH account and policy checks.
 
+## Local development
+
+The CLI requests and stores credentials, then prints an SSH command; it does not start the SSH connection itself. Export the CA public key for installation on target machines using the same CA key path as the daemon:
+
+```sh
+JIT_CA_KEY_PATH=/tmp/jit-ssh-ca go run ./cmd/jitd --print-ca-public-key > /tmp/jit_ca.pub
+```
+
+Install `/tmp/jit_ca.pub` on each target as `/etc/ssh/jit_ca.pub` and configure `sshd` with `TrustedUserCAKeys /etc/ssh/jit_ca.pub`. Only the public key belongs on target machines; keep the CA private key protected on the issuer.
+
+Start the issuer with that same CA key path:
+
+```sh
+JIT_CA_KEY_PATH=/tmp/jit-ssh-ca go run ./cmd/jitd
+```
+
+In another terminal, request credentials for a target account and host:
+
+```sh
+go run ./cmd/jit-cli access \
+  --user ubuntu \
+  --host target.internal \
+  --duration 15m \
+  --server http://127.0.0.1:8080
+```
+
+The CLI writes `id_jit_ephemeral` and `id_jit_ephemeral-cert.pub` under `~/.ssh/jit/` with restrictive permissions. It defaults the certificate identity to the local username; `--identity` can override the value recorded in the certificate. The printed command connects directly to the target, not to the issuer. The issuer's HTTP endpoint is suitable only on a trusted local boundary; use HTTPS (directly or through a trusted TLS-terminating proxy) for remote deployments. The request's identity field is not authentication.
+
+Run the project checks with:
+
+```sh
+make test
+make vet
+make build
+
+go run ./cmd/jitd --help
+go run ./cmd/jit-cli --help
+```
+
 ## Scope and status
 
-This repository describes the intended product and its development plan. The implementation is not yet present. In particular, API authentication and authorization, audit policy, revocation, CA rotation, and production transport security must be designed; they should not be assumed to exist.
+The Go module currently implements the CA lifecycle and issuance API, along with a CLI for requesting and storing certificates. API authentication and authorization, audit policy, revocation, CA rotation, and production transport security are not implemented and must not be assumed to exist.
 
 The initial requirements also mention an HTTP listener on port 8080 and HTTPS certificate signing. Before remote deployment, the transport must be made consistent and protected with TLS (directly or through a trusted TLS-terminating proxy). The identity in a request body must not be treated as authenticated identity by itself.
 
