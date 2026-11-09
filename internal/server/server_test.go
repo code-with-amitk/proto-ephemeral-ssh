@@ -196,7 +196,7 @@ func TestWebPagesAndCAKeyDownload(t *testing.T) {
 	for path, expected := range map[string][]string{
 		"/":       {"Ephemeral SSH", `id="access-form"`, `id="contact-form"`, `id="star-button"`, `src="/app.js?v=3"`, `href="/why"`, `href="/ca.pub"`, "private key is never sent"},
 		"/why":    {"Why this product exists", "Not a replacement for every PAM program"},
-		"/app.js": {"crypto.subtle.generateKey", `fetch("/api/v1/request-access"`, `fetch("/api/v1/stars"`, "mailto:test@gmail.com", "downloadFile(keyFilename, keyPair.privateKey"},
+		"/app.js": {"crypto.subtle.generateKey", `fetch("/api/v1/request-access"`, `fetch("/api/v1/stars"`, "mailto:reachtoamit7@gmail.com", "downloadFile(keyFilename, keyPair.privateKey"},
 	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		res := httptest.NewRecorder()

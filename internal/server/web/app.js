@@ -178,9 +178,9 @@ contactForm?.addEventListener("submit", (event) => {
   const message = document.querySelector("#contact-message").value.trim();
   const subject = "Ephemeral SSH contact";
   const body = `Name: ${name}\nEmail: ${email}\n\n${message}`;
-  const mailto = `mailto:test@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  const mailto = `mailto:reachtoamit7@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.location.href = mailto;
-  document.querySelector("#contact-status").textContent = "Your email app should open with your message addressed to test@gmail.com.";
+  document.querySelector("#contact-status").textContent = "Your email app should open with your message addressed to reachtoamit7@gmail.com.";
 });
 
 form?.addEventListener("submit", async (event) => {
