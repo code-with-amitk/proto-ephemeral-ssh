@@ -54,6 +54,8 @@ This is a trade-off, not a universal improvement. Enterprise PAM may provide imp
 
 The daemon serves the access homepage at `/`, the product rationale at `/why`, the CA public key download at `/ca.pub`, and the signing API at `/api/v1/request-access`. The Render blueprint in [`render.yaml`](./render.yaml) builds the Docker image and mounts a persistent disk at `/var/data`, where the CA key is stored. The CA private key must survive redeployments; do not use an ephemeral filesystem for it.
 
+The homepage's Contact Us form opens the visitor's email application with a message addressed to `test@gmail.com`; it does not send mail directly from the server. The Stars counter is shared by visitors to one running server process and resets when that process restarts.
+
 ### Deploy on Render
 
 1. Push this repository to a Git provider connected to your Render account.

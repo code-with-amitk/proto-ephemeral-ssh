@@ -5,6 +5,10 @@ const result = document.querySelector("#command-result");
 const commandOutput = document.querySelector("#cli-command");
 const errorOutput = document.querySelector("#request-error");
 const submitButton = document.querySelector("#generate-command");
+const starButton = document.querySelector("#star-button");
+const starCount = document.querySelector("#star-count");
+const starStatus = document.querySelector("#star-status");
+const contactForm = document.querySelector("#contact-form");
 
 function concatBytes(...arrays) {
   const result = new Uint8Array(arrays.reduce((size, array) => size + array.length, 0));
@@ -133,6 +137,51 @@ async function requestCertificate(identity, targetUser, duration, publicKey) {
   }
   return body.certificate.trim() + "\n";
 }
+
+async function updateStars(method = "GET") {
+  const response = await fetch("/api/v1/stars", { method });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !Number.isSafeInteger(body.count) || body.count < 0) {
+    throw new Error(body.error || `Could not load stars (HTTP ${response.status}).`);
+  }
+  starCount.textContent = body.count.toLocaleString();
+  return body.count;
+}
+
+if (starButton && starCount) {
+  updateStars()
+    .then(() => { starButton.disabled = false; })
+    .catch((error) => {
+      starCount.textContent = "Unavailable";
+      starStatus.textContent = error instanceof Error ? error.message : "Could not load stars.";
+    });
+
+  starButton.addEventListener("click", async () => {
+    starButton.disabled = true;
+    try {
+      await updateStars("POST");
+      starStatus.textContent = "";
+    } catch (error) {
+      starStatus.textContent = error instanceof Error ? error.message : "Could not add a star.";
+    } finally {
+      starButton.disabled = false;
+    }
+  });
+}
+
+contactForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!contactForm.reportValidity()) return;
+
+  const name = document.querySelector("#contact-name").value.trim();
+  const email = document.querySelector("#contact-email").value.trim();
+  const message = document.querySelector("#contact-message").value.trim();
+  const subject = "Ephemeral SSH contact";
+  const body = `Name: ${name}\nEmail: ${email}\n\n${message}`;
+  const mailto = `mailto:test@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = mailto;
+  document.querySelector("#contact-status").textContent = "Your email app should open with your message addressed to test@gmail.com.";
+});
 
 form?.addEventListener("submit", async (event) => {
   event.preventDefault();

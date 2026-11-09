@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/code-with-amitk/proto-ephemeral-ssh/internal/ca"
@@ -35,6 +36,7 @@ type AccessResponse struct {
 // Server handles certificate issuance requests.
 type Server struct {
 	issuer *ca.CA
+	stars  atomic.Uint64
 }
 
 // New creates a certificate-signing HTTP handler.
@@ -71,8 +73,22 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	case "/api/v1/request-access":
 		s.serveAccessRequest(w, r)
+	case "/api/v1/stars":
+		s.serveStars(w, r)
 	default:
 		writeJSONError(w, http.StatusNotFound, "not found")
+	}
+}
+
+func (s *Server) serveStars(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]uint64{"count": s.stars.Load()})
+	case http.MethodPost:
+		writeJSON(w, http.StatusOK, map[string]uint64{"count": s.stars.Add(1)})
+	default:
+		w.Header().Set("Allow", "GET, POST")
+		writeJSONError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
@@ -113,9 +129,7 @@ func (s *Server) serveWebFile(w http.ResponseWriter, r *http.Request, name, cont
 		return
 	}
 	w.Header().Set("Content-Type", contentType)
-	if name == "app.js" || name == "styles.css" {
-		w.Header().Set("Cache-Control", "public, max-age=3600")
-	}
+	w.Header().Set("Cache-Control", "no-store")
 	if r.Method == http.MethodHead {
 		w.Header().Set("Content-Length", fmt.Sprint(len(data)))
 		return

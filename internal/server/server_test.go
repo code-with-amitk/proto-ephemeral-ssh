@@ -194,9 +194,9 @@ func TestWebPagesAndCAKeyDownload(t *testing.T) {
 	handler := New(issuer)
 
 	for path, expected := range map[string][]string{
-		"/":       {"Short-lived SSH access", `id="access-form"`, `href="/why"`, `href="/ca.pub"`, "private key is never sent"},
+		"/":       {"Ephemeral SSH", `id="access-form"`, `id="contact-form"`, `id="star-button"`, `src="/app.js?v=3"`, `href="/why"`, `href="/ca.pub"`, "private key is never sent"},
 		"/why":    {"Why this product exists", "Not a replacement for every PAM program"},
-		"/app.js": {"crypto.subtle.generateKey", `fetch("/api/v1/request-access"`, "downloadFile(keyFilename, keyPair.privateKey"},
+		"/app.js": {"crypto.subtle.generateKey", `fetch("/api/v1/request-access"`, `fetch("/api/v1/stars"`, "mailto:test@gmail.com", "downloadFile(keyFilename, keyPair.privateKey"},
 	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		res := httptest.NewRecorder()
@@ -214,6 +214,9 @@ func TestWebPagesAndCAKeyDownload(t *testing.T) {
 		}
 		if res.Header().Get("Content-Security-Policy") == "" {
 			t.Errorf("GET %s missing content security policy", path)
+		}
+		if got := res.Header().Get("Cache-Control"); got != "no-store" {
+			t.Errorf("GET %s Cache-Control = %q, want no-store", path, got)
 		}
 	}
 
@@ -236,6 +239,54 @@ func TestWebPagesAndCAKeyDownload(t *testing.T) {
 	handler.ServeHTTP(res, req)
 	if res.Code != http.StatusNoContent {
 		t.Errorf("health check status = %d, want 204", res.Code)
+	}
+}
+
+func TestStarsCountIncrements(t *testing.T) {
+	issuer, err := ca.New(filepath.Join(t.TempDir(), "ca-key"))
+	if err != nil {
+		t.Fatalf("create issuer: %v", err)
+	}
+	handler := New(issuer)
+
+	for _, want := range []uint64{0, 1, 2} {
+		method := http.MethodGet
+		if want > 0 {
+			method = http.MethodPost
+		}
+		req := httptest.NewRequest(method, "/api/v1/stars", nil)
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+		if res.Code != http.StatusOK {
+			t.Fatalf("%s /api/v1/stars status = %d, want 200", method, res.Code)
+		}
+		var body struct {
+			Count uint64 `json:"count"`
+		}
+		if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode stars response: %v", err)
+		}
+		if body.Count != want {
+			t.Fatalf("stars count = %d, want %d", body.Count, want)
+		}
+	}
+}
+
+func TestStarsRejectsUnsupportedMethod(t *testing.T) {
+	issuer, err := ca.New(filepath.Join(t.TempDir(), "ca-key"))
+	if err != nil {
+		t.Fatalf("create issuer: %v", err)
+	}
+	handler := New(issuer)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/stars", nil)
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("DELETE /api/v1/stars status = %d, want 405", res.Code)
+	}
+	if got := res.Header().Get("Allow"); got != "GET, POST" {
+		t.Fatalf("Allow = %q, want GET, POST", got)
 	}
 }
 
