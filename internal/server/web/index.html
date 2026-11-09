@@ -24,16 +24,16 @@
     <section class="panel request-panel" aria-labelledby="request-title">
       <div class="section-heading">
         <div><p class="eyebrow">CREATE YOUR COMMAND</p><h2 id="request-title">Where do you need access?</h2></div>
-        <span class="step-badge">01 / 02</span>
+        <span class="step-badge">SHORT-LIVED SSH</span>
       </div>
-      <p class="muted">Fill in the destination and issuer. We’ll prepare a command for your local CLI; your private key stays on your computer.</p>
+      <p class="muted">Enter the destination. Your browser creates a temporary SSH key, requests its certificate, and prepares a direct connection command. The private key is never sent to the issuer.</p>
       <form id="access-form">
         <div class="form-grid">
           <label>Destination username
-            <input id="target-user" name="user" autocomplete="username" placeholder="ubuntu" required maxlength="64">
+            <input id="target-user" name="user" autocomplete="username" placeholder="user who want to do ssh" required maxlength="64">
           </label>
           <label>Destination hostname or IP
-            <input id="target-host" name="host" autocomplete="url" placeholder="server.example.com" required maxlength="253">
+            <input id="target-host" name="host" autocomplete="url" placeholder="target server where ssh need to be done" required maxlength="253">
           </label>
           <label>Requested certificate duration
             <select id="duration" name="duration">
@@ -42,34 +42,21 @@
               <option value="15m" selected>15 minutes (maximum)</option>
             </select>
           </label>
-          <label>Issuer hostname or IP
-            <input id="issuer-host" name="issuer-host" required maxlength="253">
-          </label>
-          <label>Issuer port
-            <input id="issuer-port" name="issuer-port" type="number" min="1" max="65535" required>
-          </label>
-          <label>Issuer protocol
-            <select id="issuer-scheme" name="issuer-scheme">
-              <option value="https">HTTPS (recommended)</option>
-              <option value="http">HTTP (local development only)</option>
-            </select>
-          </label>
         </div>
-        <p class="field-note">For Render, use your service’s public hostname, HTTPS, and port 443. The internal service port is managed by Render.</p>
-        <button class="button" type="submit">Generate CLI command <span aria-hidden="true">→</span></button>
+        <p class="field-note">Your certificate request goes to this site over HTTPS. The issuer enforces a 15-minute maximum.</p>
+        <button id="generate-command" class="button" type="submit">Request certificate &amp; prepare SSH command <span aria-hidden="true">→</span></button>
+        <p id="request-error" class="request-error" role="alert" hidden></p>
       </form>
 
       <section id="command-result" class="command-result" aria-live="polite" hidden>
-        <p class="eyebrow">RUN THIS ON YOUR COMPUTER</p>
-        <p class="muted">This requests and saves your certificate locally. It does not connect to the target yet.</p>
-        <p class="muted">Install <code>jit-cli</code> first. From a checkout of this repository, build it into your local executable path:</p>
-        <pre><code>mkdir -p "$HOME/.local/bin" &amp;&amp; go build -o "$HOME/.local/bin/jit-cli" ./cmd/jit-cli</code></pre>
-        <p class="field-note">Run that from the repository root, and make sure <code>$HOME/.local/bin</code> is on your <code>PATH</code>.</p>
+        <p class="eyebrow">CERTIFICATE READY</p>
+        <p class="muted">Your browser downloaded a private key and its certificate. The private key was generated here and was not sent to the issuer.</p>
+        <p class="field-note">On your Linux computer, run this command to move the downloaded files into <code>~/.ssh/jit/</code>, set private permissions, and connect. It assumes your browser saves files to <code>~/Downloads</code>; adjust those paths if your download folder is different.</p>
         <pre><code id="cli-command"></code></pre>
-        <button id="copy-command" class="button button-secondary" type="button">Copy command</button>
+        <button id="copy-command" class="button button-secondary" type="button">Copy SSH command</button>
         <div class="next-step">
-          <strong>Then connect</strong>
-          <p>Run the command above. The CLI will print an SSH command that uses the generated key and certificate. Run that printed command to log in. First, the target server must trust this issuer’s CA public key; see the setup instructions below.</p>
+          <strong>Ready to connect</strong>
+          <p>This moves the downloaded credentials under <code>~/.ssh/jit/</code> and starts a direct SSH connection to your target. The target must trust this issuer’s CA public key; see the setup instructions below.</p>
         </div>
       </section>
     </section>
@@ -83,7 +70,7 @@
         <li><span>Download the <a href="/ca.pub">CA public key</a>. Only this public key belongs on target servers; never copy the CA private key.</span></li>
         <li><span>Copy it to each target server as <code>/etc/ssh/jit_ca.pub</code>, then set ownership and permissions: <code>sudo install -o root -g root -m 0644 jit_ca.pub /etc/ssh/jit_ca.pub</code></span></li>
         <li><span>Add <code>TrustedUserCAKeys /etc/ssh/jit_ca.pub</code> to <code>/etc/ssh/sshd_config</code>. Validate with <code>sudo sshd -t</code>, then reload SSH (often <code>sudo systemctl reload sshd</code>; on Debian/Ubuntu the service may be named <code>ssh</code>).</span></li>
-        <li><span>Request access with the form above and run the SSH command printed by the CLI. The target account must already exist and match the requested username.</span></li>
+        <li><span>Request access with the form above and run the generated SSH command on your Linux computer. The target account must already exist and match the requested username.</span></li>
       </ol>
       <p class="notice"><strong>Operator note:</strong> protect and back up the CA private key on the issuer’s persistent disk. Anyone who can request certificates can currently ask for any target account; this service does not yet authenticate or authorize requesters. Do not expose it publicly for production use without adding access controls.</p>
     </section>

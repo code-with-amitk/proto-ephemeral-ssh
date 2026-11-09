@@ -52,7 +52,7 @@ This is a trade-off, not a universal improvement. Enterprise PAM may provide imp
 
 ## Render deployment and web flow
 
-The daemon serves the access-command homepage at `/`, the product rationale at `/why`, the CA public key download at `/ca.pub`, and the signing API at `/api/v1/request-access`. The Render blueprint in [`render.yaml`](./render.yaml) builds the Docker image and mounts a persistent disk at `/var/data`, where the CA key is stored. The CA private key must survive redeployments; do not use an ephemeral filesystem for it.
+The daemon serves the access homepage at `/`, the product rationale at `/why`, the CA public key download at `/ca.pub`, and the signing API at `/api/v1/request-access`. The Render blueprint in [`render.yaml`](./render.yaml) builds the Docker image and mounts a persistent disk at `/var/data`, where the CA key is stored. The CA private key must survive redeployments; do not use an ephemeral filesystem for it.
 
 ### Deploy on Render
 
@@ -66,21 +66,15 @@ Render's persistent disk preserves the CA identity across deploys. Protect acces
 
 ### Request a certificate and connect
 
-Install the CLI on the computer from which you will connect. From a repository checkout, build it into a directory on your `PATH`:
-
-```sh
-mkdir -p "$HOME/.local/bin"
-go build -o "$HOME/.local/bin/jit-cli" ./cmd/jit-cli
-```
-
-Run the build command from the repository root and ensure `$HOME/.local/bin` is on your `PATH`. Then open the service homepage and provide:
+Open the service homepage and provide:
 
 - **Destination username**: the existing account on the target machine (for example, `ubuntu`).
 - **Destination hostname or IP**: where SSH should connect (for example, `target.example.com`).
 - **Duration**: choose 5, 10, or 15 minutes. The issuer enforces a 15-minute maximum.
-- **Issuer hostname, port, and protocol**: for Render, use the public `*.onrender.com` hostname, port `443`, and `HTTPS`.
 
-The form creates a copyable `jit-cli access` command; it does not create credentials in the browser. Run the command locally. The CLI generates the ephemeral private key on your computer, sends only its public key to the issuer, saves the private key and returned certificate under `~/.ssh/jit/`, then prints the SSH connection command. Run that printed `ssh ...` command to connect directly to the target. Certificate issuance does not itself open an SSH session.
+When you submit the form, your browser generates an ephemeral Ed25519 keypair locally and sends only the public key to the issuer over HTTPS. The browser downloads the private key and signed certificate separately; the private key is not sent to Render. The page then provides one shell command that moves both files from `~/Downloads` under `~/.ssh/jit/`, sets restrictive permissions, and starts SSH directly to the target. If your browser saves downloads somewhere else, update the source paths in that command. The target must trust the issuer CA public key before login will succeed.
+
+The CLI remains available for terminal-only workflows. It generates and stores credentials on the machine where you run it and prints an SSH connection command.
 
 **Security limitation:** the current signing API does not authenticate callers or authorize target accounts; the `identity` value is not proof of identity. Render services are publicly reachable by default. Do not expose this issuer publicly or use it for production access until requester authentication and authorization (and any needed audit, rate limiting, and policy controls) are implemented. HTTPS protects traffic in transit but does not provide caller authorization.
 

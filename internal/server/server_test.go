@@ -194,8 +194,9 @@ func TestWebPagesAndCAKeyDownload(t *testing.T) {
 	handler := New(issuer)
 
 	for path, expected := range map[string][]string{
-		"/":    {"Short-lived SSH access", `id="access-form"`, `href="/why"`, `href="/ca.pub"`},
-		"/why": {"Why this product exists", "Not a replacement for every PAM program"},
+		"/":       {"Short-lived SSH access", `id="access-form"`, `href="/why"`, `href="/ca.pub"`, "private key is never sent"},
+		"/why":    {"Why this product exists", "Not a replacement for every PAM program"},
+		"/app.js": {"crypto.subtle.generateKey", `fetch("/api/v1/request-access"`, "downloadFile(keyFilename, keyPair.privateKey"},
 	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		res := httptest.NewRecorder()
@@ -207,6 +208,9 @@ func TestWebPagesAndCAKeyDownload(t *testing.T) {
 			if !strings.Contains(res.Body.String(), text) {
 				t.Errorf("GET %s body does not contain %q", path, text)
 			}
+		}
+		if path == "/app.js" && strings.Contains(res.Body.String(), "jit-cli") {
+			t.Error("browser flow should not require running jit-cli")
 		}
 		if res.Header().Get("Content-Security-Policy") == "" {
 			t.Errorf("GET %s missing content security policy", path)

@@ -39,8 +39,10 @@ input:focus, select:focus { border-color: var(--green); box-shadow: 0 0 0 3px #1
 .field-note { color: var(--muted); font-size: 12px; margin: 0 0 20px; }
 .button { display: inline-flex; align-items: center; justify-content: center; gap: 20px; min-height: 44px; padding: 0 17px; border: 0; border-radius: 7px; background: var(--green); color: white; font: 700 13px var(--sans); text-decoration: none; cursor: pointer; }
 .button:hover { background: var(--green-dark); }
+.button:disabled { opacity: .7; cursor: wait; }
 .button-secondary { border: 1px solid var(--line); color: var(--green); background: white; }
 .button-secondary:hover { color: white; }
+.request-error { margin: 14px 0 0; padding: 12px 14px; border: 1px solid #e6b9b4; border-radius: 7px; background: #fff1ef; color: #8d2921; font-size: 13px; }
 .command-result { margin-top: 30px; padding-top: 26px; border-top: 1px solid var(--line); }
 pre { overflow: auto; margin: 14px 0; padding: 17px; border-radius: 8px; background: #14251e; color: #d5f3df; white-space: pre-wrap; overflow-wrap: anywhere; }
 pre code, code { font-family: var(--mono); font-size: .88em; }
