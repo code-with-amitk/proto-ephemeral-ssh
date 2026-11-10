@@ -35,6 +35,13 @@ The intended maximum certificate lifetime is 15 minutes. OpenSSH validates the c
 
 image::/images/pro2.png[Flow]
 
+image::/images/pro1.png[Product on Render]
+
+== Video
+video::https://youtu.be/WeXxz9asOXs?si=urllUFR0c9t6DwW8[youtube]
+
+link:https://youtu.be/WeXxz9asOXs?si=urllUFR0c9t6DwW8[Video Explanation]
+
 == Comparison with Enterprise PAM(CyberArk, BeyondTrust)
 
 Enterprise PAM deployments are configurable and may offer capabilities beyond SSH key management.
