@@ -1,0 +1,55 @@
+:toc:
+:toclevels: 4
+
+= Testing
+
+== Start server
+Run `jitd` with a temporary CA key:
+
+```sh
+JIT_CA_KEY_PATH=/tmp/jit-ssh-ca go run ./cmd/jitd
+```
+
+== Get certificate from server, Print
+```
+// Generate the pub,pvt keys
+$ ssh-keygen -o
+
+// Get certificate from server
+$ curl --fail-with-body -sS -X POST http://127.0.0.1:8080/api/v1/request-access \
+  -H 'Content-Type: application/json' \
+  -d "{\"identity\":\"smoke-test\",\"target_user\":\"ubuntu\",\"duration_minutes\":15,\"public_key\":\"$(cat /tmp/jit-smoke-key.pub)\"}" \
+  | jq -r '.certificate' > /tmp/jit-issued-cert.pub
+
+// Print ssh certificate
+$ ssh-keygen -L -f /tmp/jit-issued-cert.pub
+/tmp/jit-issued-cert.pub:
+  Type: ssh-rsa-cert-v01@openssh.com user certificate
+  Public key: RSA-CERT SHA256:i29kviKFwzdPpIlGFDRmUJZJTrSxvmLOu10f5N/5d9g
+  Signing CA: ED25519 SHA256:q7UAFnnb3xuQNH2AsHZgzxBzHI0UFzTVuXzMbEb/1G4 (using ssh-ed25519)
+  Key ID: "smoke-test"
+  Serial: 1
+  Valid: from 2026-11-08T17:24:50 to 2026-11-08T17:40:50    <<< Duration 15 minutes
+  Principals: 
+          ubuntu                <<<<< Server to whom client should connect
+  Critical Options: (none)
+  Extensions: 
+          permit-pty
+
+// Format of certificate
+Type: 
+  Format of the SSH certificate. Contains RSA public key wrapped in an OpenSSH version 1 user certificate structure.
+  @openssh.com suffix is just a namespace format used by OpenSSH to define its proprietary standards.
+Public key:
+  This is SHA256 cryptographic fingerprint(HASH) of your Client's public key. Base64(SHA256(Client's Public Key))
+Extensions: 
+  permit-pty: 
+    - Server to grant Pseudo-Terminal (PTY) when you connect to the server.
+    - Because it is present, you are allowed to log into the terminal normally, see a command prompt (ubuntu@server:~$),
+```
+The response must contain a parseable OpenSSH user certificate; a request above the maximum must never produce a certificate valid for more than 15 minutes.
+
+== CLI client connect to SSH server
+```
+$ ssh -i private_key_file -o "CertificateFile=$HOME/.ssh/jit/jit-cert.pub" username@ssh-server
+```

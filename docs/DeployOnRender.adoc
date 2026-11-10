@@ -1,0 +1,9 @@
+:toc:
+:toclevels: 4
+
+= Deploy on Render
+
+- In Render, choose **New → Docker web**.
+- Keep the service's `PORT` environment variable set to `8080`; the daemon listens on that port inside the container while Render provides the public HTTPS endpoint. The blueprint configures the health check at `/healthz`.
+- Wait for the service to become healthy. Open the public `https://proto-ephemeral-ssh.onrender.com/` URL. The service's public issuer address is the Render hostname, HTTPS, port `443` (not the container port).
+- Download `/ca.pub` from the service. Install that public key on each destination host as `/etc/ssh/jit_ca.pub`, configure `TrustedUserCAKeys /etc/ssh/jit_ca.pub` in `/etc/ssh/sshd_config`, run `sudo sshd -t`, and reload the SSH service (`sshd` or, on some Debian/Ubuntu hosts, `ssh`). Only the CA **public** key belongs on target hosts.

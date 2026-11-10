@@ -1,0 +1,38 @@
+:toc:
+:toclevels: 4
+
+= Request a certificate and connect
+
+Open the service homepage and provide:
+
+- **Destination username**: the existing account on the target machine (for example, `ubuntu`).
+- **Destination hostname or IP**: where SSH should connect (for example, `target.example.com`).
+- **Public Key**
+- **Duration**: choose 5, 10, or 15 minutes. The issuer enforces a 15-minute maximum.
+
+- When you submit the form, your browser generates ssh client signed certificate locally and sends only the public key to the issuer over HTTPS. 
+The page then provides one shell commands which you can follow to login to SSH server
+
+- The CLI remains available for terminal-only workflows. 
+
+**Security limitation:** the current signing API does not authenticate callers or authorize target accounts; the `identity` value is not proof of identity. Render services are publicly reachable by default. Do not expose this issuer publicly or use it for production access until requester authentication and authorization (and any needed audit, rate limiting, and policy controls) are implemented. HTTPS protects traffic in transit but does not provide caller authorization.
+
+== Start CA
+Start the issuer with that same CA key path:
+
+```sh
+JIT_CA_KEY_PATH=/tmp/jit-ssh-ca go run ./cmd/jitd
+```
+
+In another terminal, request credentials for a target account and host:
+
+```sh
+go run ./cmd/jit-cli access \
+  --user ubuntu \
+  --host target.internal \
+  --duration 15m \
+  --server http://127.0.0.1:8080
+```
+
+Install `/tmp/jit_ca.pub` on each target as `/etc/ssh/jit_ca.pub` and configure `sshd` with `TrustedUserCAKeys /etc/ssh/jit_ca.pub`. Only the public key belongs on target machines; keep the CA private key protected on the issuer.
+

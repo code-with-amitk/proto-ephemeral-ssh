@@ -2,11 +2,17 @@
 :toclevels: 5
 
 
-= Ephemeral SSH using Certificates
+= Ephemeral SSH using Certificates / JIT SSH
+
+- This project is a just-in-time (JIT) SSH access Solution. Instead of distributing each user's long-lived public key into target accounts' `~/.ssh/authorized_keys`, it issues short-lived OpenSSH user certificates signed by an SSH certificate authority (CA).
+
+- The intended default maximum certificate lifetime is `15 minutes`. A user generates a temporary `Ed25519 or RSA` keypair on their client; the private key stays on that client, while the public key is sent to the `JIT-SSH`. `JIT-SSH` signs the public key & provides user certificate containing the requesting identity and permitted target account. 
+
+- User then connects directly to the target over SSH using the key and certificate. The target's `sshd` trusts the CA public key and validates the certificate, principal, and validity period.
 
 - This project is intended to make short-lived SSH access practical for teams that want an OpenSSH-native workflow without adopting a full privileged access management (PAM) platform solely to issue SSH credentials. 
 
-- CyberArk documents OpenSSH-based authentication as part of its PAM offering ([CyberArk documentation](https://docs.cyberark.com/pam-self-hosted/latest/en/content/pasimp/configuring-authentication-methods.htm)). That can be the right choice when an organization needs an integrated PAM program: centralized credential management, policy and approvals, session controls, auditing, and other enterprise workflows.
+- CyberArk documents OpenSSH-based authentication as part of its PAM offering (link:https://docs.cyberark.com/pam-self-hosted/latest/en/content/pasimp/configuring-authentication-methods.htm[CyberArk documentation]). That can be the right choice when an organization needs an integrated PAM program: centralized credential management, policy and approvals, session controls, auditing, and other enterprise workflows.
 
 - This project's intended niche is narrower: teams that primarily need short-lived SSH certificates and prefer a small, purpose-built service they can operate alongside their existing identity and infrastructure.
 
@@ -16,92 +22,52 @@
 - **Short-lived credentials:** certificates expire automatically according to their validity window, reducing reliance on long-lived client credentials. 
 - **Direct session path:** after certificate issuance, the client connects to the target. An inline SSH session proxy is not required by this design.
 - **Small, inspectable scope:** the intended product is limited to certificate issuance and client setup, with room to integrate an organization's existing identity and policy systems.
+- **Centralized Certificate Issuance:** central entity controls the certificate issuance and public key management.
 
 == WorkFlow
 - SSH Client will generate public, pvt keys
-- "Go Engine" is Signing CA and listening on 8080
-- SSH Client will request open-ssh certificate from "GO ENGINE" using its public key on endpoint "/api/v1/request-access"
-- "GO ENGINE" will generate a OpenSSH certificate for SSH Client expiring in 15 minutes.
+- `Go Engine` is Signing CA and listening on 8080
+- SSH Client will request open-ssh certificate from `GO ENGINE` using its public key on endpoint `/api/v1/request-access`
+- `GO ENGINE` will generate a OpenSSH certificate for SSH Client expiring in 15 minutes.
 - SSH Client will login using certificate to Linux Server
 
 The intended maximum certificate lifetime is 15 minutes. OpenSSH validates the certificate's signature, validity period, and principal when the client authenticates. The engine is involved in certificate issuance, not in the SSH session's data path.
 
-
 image::/images/pro2.png[Flow]
 
-== Using the Product
+== Comparison with Enterprise PAM(CyberArk, BeyondTrust)
 
-- Product is live on [Render]https://proto-ephemeral-ssh.onrender.com/
+Enterprise PAM deployments are configurable and may offer capabilities beyond SSH key management.
 
-== Deploy on Render
+|===
+| Area | This JIT SSH design | Common PAM deployment pattern
+| SSH credential | Client-held private key plus a short-lived CA-signed user certificate | May broker or retrieve credentials managed in a vault, including static SSH credentials
+| Lifetime | Issued certificate is capped at 15 minutes by the engine; OpenSSH checks its validity when authenticating | A vaulted credential may remain usable until rotation, expiry, or policy action; schedules vary
+| Target trust | One CA trust entry, `TrustedUserCAKeys /etc/ssh/jit_ca.pub`; no per-user key distribution is needed for this flow | Depending on configuration, public keys or managed accounts may need to be provisioned on target systems
+| SSH data path | Client connects directly to the target after certificate issuance | Some deployments route sessions through an inline session proxy or jump host; others may use different designs
+| Operational trade-off | Lightweight SSH-specific issuance and direct connectivity; the organization must build identity, authorization, audit, and CA operations around it | Broader PAM workflows and controls, with the operational and infrastructure footprint of the selected deployment
+|===
 
-2. In Render, choose **New → Blueprint**, select the repository, and apply the `render.yaml` blueprint. Review the service and persistent-disk cost before creating it. Alternatively, create a Docker web service manually, set the disk mount path to `/var/data`, and set `JIT_CA_KEY_PATH=/var/data/ca_key`.
-3. Keep the service's `PORT` environment variable set to `8080`; the daemon listens on that port inside the container while Render provides the public HTTPS endpoint. The blueprint configures the health check at `/healthz`.
-4. Wait for the service to become healthy. Open the public `https://<service-name>.onrender.com/` URL. The service's public issuer address is the Render hostname, HTTPS, port `443` (not the container port).
-5. Download `/ca.pub` from the service. Install that public key on each destination host as `/etc/ssh/jit_ca.pub`, configure `TrustedUserCAKeys /etc/ssh/jit_ca.pub` in `/etc/ssh/sshd_config`, run `sudo sshd -t`, and reload the SSH service (`sshd` or, on some Debian/Ubuntu hosts, `ssh`). Only the CA **public** key belongs on target hosts.
+== Intended users and boundaries
 
-Render's persistent disk preserves the CA identity across deploys. Protect access to that disk and maintain a secure backup of the CA private key. A lost or replaced key changes the CA identity and requires distributing the new public key to every target. Persistent disks are a paid Render feature and generally constrain a service to one running instance; review current Render limits and pricing.
+The intended operators are teams that want short-lived SSH certificate-based access to managed Linux hosts and can operate an SSH CA securely.
 
-== Request a certificate and connect
+- A Go daemon that loads or creates an Ed25519 SSH CA and signs user certificates.
+- An API endpoint for certificate requests.
+- A CLI that creates a temporary Ed25519 keypair, requests a certificate, writes the resulting key and certificate to the user's SSH directory, and prints a direct SSH command.
+- Target-side OpenSSH CA trust configuration and test coverage.
 
-Open the service homepage and provide:
+Not yet implemented:
 
-- **Destination username**: the existing account on the target machine (for example, `ubuntu`).
-- **Destination hostname or IP**: where SSH should connect (for example, `target.example.com`).
-- **Duration**: choose 5, 10, or 15 minutes. The issuer enforces a 15-minute maximum.
+- How the caller authenticates to the API or how identities and target accounts are authorized.
+- HTTPS termination and certificate management. The requirements mention both HTTP port 8080 and HTTPS signing; these must be reconciled before deployment outside a trusted local boundary.
+- Approval policy, audit retention, rate limiting, certificate revocation, multi-tenant isolation, high availability, and CA rotation.
+- Whether distribution is one executable with daemon/client subcommands or separate daemon and CLI executables built from one Go module.
 
-When you submit the form, your browser generates an ephemeral Ed25519 keypair locally and sends only the public key to the issuer over HTTPS. The browser downloads the private key and signed certificate separately; the private key is not sent to Render. The page then provides one shell command that moves both files from `~/Downloads` under `~/.ssh/jit/`, sets restrictive permissions, and starts SSH directly to the target. If your browser saves downloads somewhere else, update the source paths in that command. The target must trust the issuer CA public key before login will succeed.
+== Using JIT SSH
 
-The CLI remains available for terminal-only workflows. It generates and stores credentials on the machine where you run it and prints an SSH connection command.
+- Product is live on link:https://proto-ephemeral-ssh.onrender.com/[Render].
 
-**Security limitation:** the current signing API does not authenticate callers or authorize target accounts; the `identity` value is not proof of identity. Render services are publicly reachable by default. Do not expose this issuer publicly or use it for production access until requester authentication and authorization (and any needed audit, rate limiting, and policy controls) are implemented. HTTPS protects traffic in transit but does not provide caller authorization.
-
-== Planned request flow
-
-1. The user invokes `jit-cli access` with a target account, host, and requested duration.
-2. The CLI generates an ephemeral Ed25519 keypair. The private key remains on the client; only the public key is sent to the engine.
-3. The engine authenticates the requester, authorizes access to the requested target account, and signs a user certificate with a server-enforced lifetime of no more than 15 minutes.
-4. The CLI stores the private key and certificate locally with restrictive permissions and prints a direct SSH command.
-5. The target's `sshd` accepts certificates signed by the configured CA, subject to normal OpenSSH account and policy checks.
-
-== Local development
-
-The CLI requests and stores credentials, then prints an SSH command; it does not start the SSH connection itself. Export the CA public key for installation on target machines using the same CA key path as the daemon:
-
-```sh
-JIT_CA_KEY_PATH=/tmp/jit-ssh-ca go run ./cmd/jitd --print-ca-public-key > /tmp/jit_ca.pub
-```
-
-Install `/tmp/jit_ca.pub` on each target as `/etc/ssh/jit_ca.pub` and configure `sshd` with `TrustedUserCAKeys /etc/ssh/jit_ca.pub`. Only the public key belongs on target machines; keep the CA private key protected on the issuer.
-
-Start the issuer with that same CA key path:
-
-```sh
-JIT_CA_KEY_PATH=/tmp/jit-ssh-ca go run ./cmd/jitd
-```
-
-In another terminal, request credentials for a target account and host:
-
-```sh
-go run ./cmd/jit-cli access \
-  --user ubuntu \
-  --host target.internal \
-  --duration 15m \
-  --server http://127.0.0.1:8080
-```
-
-The CLI writes `id_jit_ephemeral` and `id_jit_ephemeral-cert.pub` under `~/.ssh/jit/` with restrictive permissions. It defaults the certificate identity to the local username; `--identity` can override the value recorded in the certificate. The printed command connects directly to the target, not to the issuer. The issuer's HTTP endpoint is suitable only on a trusted local boundary; use HTTPS (directly or through a trusted TLS-terminating proxy) for remote deployments. The request's identity field is not authentication.
-
-Run the project checks with:
-
-```sh
-make test
-make vet
-make build
-
-go run ./cmd/jitd --help
-go run ./cmd/jit-cli --help
-```
 
 == Scope and status
 
@@ -109,4 +75,8 @@ The Go module currently implements the CA lifecycle and issuance API, along with
 
 The initial requirements also mention an HTTP listener on port 8080 and HTTPS certificate signing. Before remote deployment, the transport must be made consistent and protected with TLS (directly or through a trusted TLS-terminating proxy). The identity in a request body must not be treated as authenticated identity by itself.
 
-See [the product overview](./docs/README.md), [the architecture](./docs/architecture.md), and the [phased development TODO](./TODOList.md) for more detail and testable milestones.
+== Other Documentation
+=== link:./docs/arhitecture.adoc[The Architecture]
+=== link:./docs/ConnectToSSHServer.adoc[Connect to SSH Server]
+=== link:./docs/DeployOnRender.adoc[Deploy on Render]
+=== link:./docs/Test.adoc[Testing Server, Client locally]
