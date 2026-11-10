@@ -67,6 +67,7 @@ pre code { font-size: 12px; }
 .contact-panel > .muted { margin: 8px 0 0; }
 .contact-grid { margin-top: 20px; }
 .contact-message { grid-column: 1 / -1; }
+.public-key-field { grid-column: 1 / -1; }
 .contact-panel .field-note { margin: 12px 0 0; }
 .contact-panel .button + .field-note { margin-top: 14px; }
 footer { min-height: 70px; padding: 20px max(6vw, calc((100vw - 1120px) / 2)); display: flex; justify-content: space-between; align-items: center; gap: 20px; border-top: 1px solid var(--line); background: #fff; color: var(--muted); font-size: 12px; }

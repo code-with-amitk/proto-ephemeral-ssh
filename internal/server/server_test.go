@@ -194,9 +194,9 @@ func TestWebPagesAndCAKeyDownload(t *testing.T) {
 	handler := New(issuer)
 
 	for path, expected := range map[string][]string{
-		"/":       {"Ephemeral SSH", `id="access-form"`, `id="contact-form"`, `id="star-button"`, `src="/app.js?v=3"`, `href="/why"`, `href="/ca.pub"`, "private key is never sent"},
+		"/":       {"Ephemeral SSH", `id="access-form"`, `id="contact-form"`, `id="star-button"`, `src="/app.js?v=4"`, `href="/why"`, `href="/ca.pub"`, `id="public-key"`, `id="private-key-path"`, "Only your public key is sent"},
 		"/why":    {"Why this product exists", "Not a replacement for every PAM program"},
-		"/app.js": {"crypto.subtle.generateKey", `fetch("/api/v1/request-access"`, `fetch("/api/v1/stars"`, "mailto:reachtoamit7@gmail.com", "downloadFile(keyFilename, keyPair.privateKey"},
+		"/app.js": {`fetch("/api/v1/request-access"`, `fetch("/api/v1/stars"`, "mailto:reachtoamit7@gmail.com", `downloadFile(certificateFilename, certificate`},
 	} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)
 		res := httptest.NewRecorder()
@@ -211,6 +211,12 @@ func TestWebPagesAndCAKeyDownload(t *testing.T) {
 		}
 		if path == "/app.js" && strings.Contains(res.Body.String(), "jit-cli") {
 			t.Error("browser flow should not require running jit-cli")
+		}
+		if path == "/app.js" && (strings.Contains(res.Body.String(), "generateKey") || strings.Contains(res.Body.String(), "privateKey, ")) {
+			t.Error("browser flow should not generate or download a private key")
+		}
+		if path == "/app.js" && strings.Contains(res.Body.String(), "/ca.pub") {
+			t.Error("certificate request flow should not download the CA public key")
 		}
 		if res.Header().Get("Content-Security-Policy") == "" {
 			t.Errorf("GET %s missing content security policy", path)
