@@ -194,7 +194,7 @@ func TestWebPagesAndCAKeyDownload(t *testing.T) {
 	handler := New(issuer)
 
 	for path, expected := range map[string][]string{
-		"/":       {"Ephemeral SSH", `id="access-form"`, `id="contact-form"`, `id="star-button"`, `src="/app.js?v=4"`, `href="/why"`, `href="/ca.pub"`, `id="public-key"`, `id="private-key-path"`, "Only your public key is sent"},
+		"/":       {"Ephemeral SSH", `id="access-form"`, `id="contact-form"`, `id="star-button"`, `src="/app.js?v=4"`, `href="/why"`, `href="/ca.pub"`, `id="public-key"`, "Only your public key is sent"},
 		"/why":    {"Why this product exists", "Not a replacement for every PAM program"},
 		"/app.js": {`fetch("/api/v1/request-access"`, `fetch("/api/v1/stars"`, "mailto:reachtoamit7@gmail.com", `downloadFile(certificateFilename, certificate`},
 	} {
@@ -217,6 +217,9 @@ func TestWebPagesAndCAKeyDownload(t *testing.T) {
 		}
 		if path == "/app.js" && strings.Contains(res.Body.String(), "/ca.pub") {
 			t.Error("certificate request flow should not download the CA public key")
+		}
+		if path == "/" && strings.Contains(res.Body.String(), `id="private-key-path"`) {
+			t.Error("form should not ask for a private-key path")
 		}
 		if res.Header().Get("Content-Security-Policy") == "" {
 			t.Errorf("GET %s missing content security policy", path)

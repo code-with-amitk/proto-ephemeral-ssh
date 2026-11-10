@@ -100,7 +100,6 @@ form?.addEventListener("submit", async (event) => {
   const username = document.querySelector("#target-user").value.trim();
   const targetHost = document.querySelector("#target-host").value.trim();
   const publicKey = document.querySelector("#public-key").value.trim();
-  const privateKeyPath = document.querySelector("#private-key-path").value.trim();
   const duration = document.querySelector("#duration").value;
   if (!/^[a-zA-Z0-9._-]+$/.test(username) || username.startsWith("-")) {
     document.querySelector("#target-user").setCustomValidity("Use a valid SSH account name.");
@@ -112,12 +111,6 @@ form?.addEventListener("submit", async (event) => {
     document.querySelector("#target-host").setCustomValidity("Use a hostname or IP address, without spaces.");
     document.querySelector("#target-host").reportValidity();
     document.querySelector("#target-host").setCustomValidity("");
-    return;
-  }
-  if (!/^[a-zA-Z0-9._/+~-]+$/.test(privateKeyPath) || privateKeyPath.startsWith("-")) {
-    document.querySelector("#private-key-path").setCustomValidity("Use a file path without spaces or shell characters.");
-    document.querySelector("#private-key-path").reportValidity();
-    document.querySelector("#private-key-path").setCustomValidity("");
     return;
   }
   if (!/^(ssh-(ed25519|rsa)|ecdsa-sha2-nistp(256|384|521))\s+\S+/.test(publicKey)) {
@@ -134,14 +127,11 @@ form?.addEventListener("submit", async (event) => {
     const credentialId = Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => byte.toString(16).padStart(2, "0")).join("");
     const certificateFilename = `jit-${credentialId}-cert.pub`;
     const certificatePath = `"$HOME/.ssh/jit/${certificateFilename}"`;
-    const privateKeyArgument = privateKeyPath.startsWith("~/")
-      ? `"$HOME/${privateKeyPath.slice(2)}"`
-      : quoteShell(privateKeyPath);
     const commands = [
       `mkdir -p "$HOME/.ssh/jit" && chmod 700 "$HOME/.ssh/jit"`,
       `mv -- "$HOME/Downloads/${certificateFilename}" ${certificatePath}`,
       `chmod 600 ${certificatePath}`,
-      `ssh -i ${privateKeyArgument} -o "CertificateFile=$HOME/.ssh/jit/${certificateFilename}" ${quoteShell(`${username}@${targetHost}`)}`
+      `ssh -i "$HOME/.ssh/id_ed25519" -o "CertificateFile=$HOME/.ssh/jit/${certificateFilename}" ${quoteShell(`${username}@${targetHost}`)}`
     ];
     downloadFile(certificateFilename, certificate, "application/vnd.openssh.cert");
     commandOutput.textContent = commands.join(" && \\\n  ");
